@@ -1,0 +1,262 @@
+CREATE database dannys_diner;
+
+use dannys_diner;
+SET search_path = dannys_diner;
+drop schema  dannys_diner;
+CREATE TABLE sales (
+  customer_id VARCHAR(1),
+  order_date DATE,
+  product_id INT
+);
+
+drop table Sales;
+
+INSERT INTO sales
+  (customer_id, order_date, product_id)
+VALUES
+  ('A', '2021-01-01', 1),
+  ('A', '2021-01-01', 2),
+  ('A', '2021-01-07', 2),
+  ('A', '2021-01-10', 3),
+  ('A', '2021-01-11', 3),
+  ('A', '2021-01-11', 3),
+  ('B', '2021-01-01', 2),
+  ('B', '2021-01-02', 2),
+  ('B', '2021-01-04', 1),
+  ('B', '2021-01-11', 1),
+  ('B', '2021-01-16', 3),
+  ('B', '2021-02-01', 3);
+
+ INSERT INTO sales
+  (customer_id, order_date, product_id)
+VALUES
+('C', '2021-01-01', 3),
+('C', '2021-01-01', 3),
+('C', '2021-01-07', 3);
+ select * from sales where customer_id in (abc);
+
+CREATE TABLE menu (
+  product_id INTEGER,
+  product_name VARCHAR(5),
+  price INTEGER
+);
+
+INSERT INTO menu
+  (product_id, product_name, price)
+VALUES
+  ('1', 'sushi', '10'),
+  ('2', 'curry', '15'),
+  ('3', 'ramen', '12');
+  
+select * from menu;
+
+CREATE TABLE members (
+  customer_id VARCHAR(1),
+  join_date DATE
+);
+
+INSERT INTO members
+  (customer_id, join_date)
+VALUES
+  ('A', '2021-01-07'),
+  ('B', '2021-01-09');
+  
+select  s.customer_id,
+  s.order_date,
+  s.product_id,
+  m.product_name,
+  m.price from sales as s 
+inner join  menu as m on s.product_id=m.product_id;
+
+-- Q1)What is the total amount each customer spent at the restaurant?
+SELECT
+  s.customer_id,
+  SUM(m.price) AS total_amount_spent
+FROM
+  sales s
+INNER JOIN
+  menu m ON s.product_id = m.product_id
+GROUP BY
+  s.customer_id
+  order by
+  s.customer_id;
+  
+-- Q2) How many days has each customer visited the restaurant? 
+
+SELECT
+  customer_id,
+  COUNT(DISTINCT order_date) AS days_visited
+FROM sales
+group by
+customer_id;
+
+-- Q3)What was the first item from the menu purchased by each customer?
+
+select distinct s.customer_id,
+  s.order_date,
+  s.product_id,
+  m.product_name,
+  m.price from sales as s 
+inner join  menu as m on s.product_id=m.product_id 
+group by customer_id
+order by customer_id;
+  
+-- Q4)What is the most purchased item on the menu and how many times was it purchased by all customers?
+
+select s.customer_id,
+  s.order_date,
+  max(m.product_name),
+  m.price,
+  count(m.product_id)from sales as s 
+inner join  menu as m on s.product_id=m.product_id 
+group by s.customer_id
+order by m.product_id;
+---------------------------------------------------------------chat_gpt
+SELECT
+  m.product_name,
+  COUNT(s.product_id) AS total_purchases
+FROM
+  menu m
+INNER JOIN
+  sales s ON m.product_id = s.product_id
+GROUP BY
+  m.product_name
+ORDER BY
+  total_purchases DESC
+LIMIT 1;
+
+-- Q5) Which item was the most popular for each customer?
+
+select distinct s.customer_id,
+  m.product_name,
+  max(s.product_id)from sales as s 
+inner join  menu as m on s.product_id=m.product_id 
+group by s.customer_id
+order by count(s.product_id) desc;
+
+-- ALTERNATIVE METHOD
+
+SELECT
+  s.customer_id,m.product_name,m.price,
+  COUNT(m.product_id) AS total_purchases
+FROM sales s
+INNER JOIN menu m ON s.product_id = m.product_id
+GROUP BY s.customer_id,m.product_name
+HAVING m.product_name=max(m.product_name)
+ORDER BY s.customer_id,m.product_name DESC
+LIMIT 10;
+-------------------------------------------------------------
+SELECT s.customer_id,m.product_name,
+COUNT(m.product_id) AS total_purchases         # WE HAVE USED INNER JOIN THEN INSIDE USING SELF JOIN  
+FROM sales s
+INNER JOIN menu m ON s.product_id = m.product_id
+GROUP BY s.customer_id, m.product_name,m.product_id
+HAVING
+  COUNT(m.product_id) = (
+    SELECT COUNT(product_id)                  
+    FROM sales s_inner
+    WHERE s_inner.customer_id = s.customer_id
+    GROUP BY s_inner.product_id
+    ORDER BY COUNT(s_inner.product_id) DESC
+    LIMIT 1
+  );
+  
+-- Q6)Which item was purchased first by the customer after they became a member?
+
+select s.customer_id,s.order_date,s.product_id,m.product_name,m.price,ms.join_date from sales as s 
+inner join  menu as m on s.product_id=m.product_id
+inner join  members as ms on s.customer_id=ms.customer_id
+where s.order_date>=ms.join_date
+group by s.customer_id
+order by s.customer_id;
+
+-- Q7) Which item was purchased just before the customer became a member?
+
+select s.customer_id,s.order_date,s.product_id,m.product_name,m.price,ms.join_date from sales as s 
+inner join  menu as m on s.product_id=m.product_id
+inner join  members as ms on s.customer_id=ms.customer_id
+where s.order_date<=ms.join_date
+group by s.customer_id
+order by s.customer_id asc,s.order_date desc;
+
+-- Q8) What is the total items and amount spent for each member before they became a member?
+
+select s.customer_id,count(s.product_id) as total_item,sum(m.price) as amount_spent from sales as s 
+inner join  menu as m on s.product_id=m.product_id
+inner join  members as ms on s.customer_id=ms.customer_id
+where s.order_date<ms.join_date
+group by s.customer_id
+order by s.customer_id;
+
+-- ALTERNATIVE
+
+create table dannys_data select * FROM
+           (SELECT  s.customer_id,s.order_date,
+			m.product_name,m.price,
+            case when s.order_date>=ms.join_date then 'Y'
+			else 'N'
+			end AS MEM
+		    from sales as s 
+			left join members as ms 
+			on s.customer_id=ms.customer_id
+			LEFT join menu as m 
+			on s.product_id=m.product_id
+            order by s.customer_id ,s.order_date,
+			m.product_name,m.price DESC ,MEM ) z 
+            ORDER BY s.customer_id ,s.order_date,
+			m.product_name,m.price;
+
+/*
+insert into dannys_data value ( select *,
+case 
+when MEM='N' then null
+else rank() over w
+end as ranking
+from dannys_data
+window w as (partition by customer_id,MEM order by order_date))
+drop table dannys_data;   */
+
+select *
+from dannys_data;
+
+alter table dannys_data
+add column RANKING varchar(5);
+ALTER TABLE dannys_data
+DROP COLUMN MEMBER;
+			
+					
+SELECT *,
+case when MEM = 'Y' THEN  rank() OVER (PARTITION BY customer_id,(case 
+			  when  order_date>=join_date then 'Y'
+			  else 'N'
+              end) ORDER BY order_date)
+			  ELSE null
+			  END debug
+              FROM dannys_data;
+
+SELECT * FROM dannys_data;
+
+DELETE  RANKING
+FROM dannys_data;
+
+create table dannys_data select * FROM(
+WITH CTE AS
+           (SELECT  s.customer_id,s.order_date,
+			m.product_name,m.price,
+            case when s.order_date>=ms.join_date then 'Y'
+			else 'N'
+			end AS MEM
+		    from sales as s 
+			left join members as ms 
+			on s.customer_id=ms.customer_id
+			LEFT join menu as m 
+			on s.product_id=m.product_id)
+            SELECT *,
+            case 
+			when MEM='N' then null
+			else rank() over w
+			end as ranking
+			from CTE
+			window w as (partition by customer_id,MEM order by order_date)
+            ORDER BY customer_id ,order_date,
+			product_name,price);
